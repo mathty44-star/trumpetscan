@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TrumpetScan AI - Seguridad Máxima</title>
     
-    <!-- Librerías estables de Google Firebase (Versión 8) -->
+    <!-- CONEXIÓN COMPATIBLE: Forzamos la versión exacta e independiente de Google Firebase -->
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
@@ -55,9 +55,10 @@
     </div>
 
     <script>
+        // Credenciales oficiales de tu proyecto TrumpetScan AI
         const firebaseConfig = {
             apiKey: "AIzaSyA819fotKek81avTqB3yP7T34sh1ogAWj0",
-            authDomain: "trumpetscan-ai.firebaseapp.com",
+            authDomain: "://firebaseapp.com",
             projectId: "trumpetscan-ai",
             storageBucket: "trumpetscan-ai.firebasestorage.app",
             messagingSenderId: "356737972999",
@@ -65,19 +66,23 @@
             measurementId: "G-C3CKYG253R"
         };
         
-        firebase.initializeApp(firebaseConfig);
+        // Inicialización nativa y forzada
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // CAPTURA EL RETORNO: Esta función detecta si el usuario viene volviendo de iniciar sesión en Google
+        // Controlamos el retorno automático de Google
         auth.getRedirectResult().then(function(result) {
-            if (result.user) {
-                console.log("Sesión iniciada vía redirección:", result.user.displayName);
+            if (result && result.user) {
+                console.log("Sesión recuperada de la redirección:", result.user.displayName);
             }
         }).catch(function(error) {
-            console.log("Error en el retorno de redirección:", error.message);
+            alert("Falta autorizar el dominio en Firebase Settings: " + error.message);
         });
 
+        // Guardián del estado de cuenta
         auth.onAuthStateChanged(function(usuario) {
             if (usuario) {
                 document.getElementById('pantallaLogin').classList.add('oculto');
@@ -102,11 +107,14 @@
                             if (datos.pruebasRestantes <= 0) {
                                 document.getElementById('zonaEscaneo').classList.add('oculto');
                                 document.getElementById('muroPago').style.display = 'block';
+                            } else {
+                                document.getElementById('zonaEscaneo').style.display = 'block';
+                                document.getElementById('muroPago').style.display = 'none';
                             }
                         }
                     }
                 }).catch(function(error) {
-                    console.log("Error consultando base de datos:", error);
+                    console.log("Error consultando la base de datos:", error);
                 });
             } else {
                 document.getElementById('pantallaLogin').classList.remove('oculto');
@@ -114,9 +122,10 @@
             }
         });
 
-        // SOLUCIÓN RADICAL: Cambiamos signInWithPopup por signInWithRedirect
+        // ACCIÓN DEL BOTÓN PRINCIPAL (Redirección total e inmediata)
         function iniciarSesionGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
+            // Forzamos al navegador a salir de la app hacia la pantalla segura de Google
             auth.signInWithRedirect(provider);
         }
 
