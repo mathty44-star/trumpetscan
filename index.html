@@ -4,12 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TrumpetScan AI - Seguridad Máxima</title>
-    
-    <!-- CONEXIÓN COMPATIBLE: Forzamos la versión exacta e independiente de Google Firebase -->
-    <script src="https://gstatic.com"></script>
-    <script src="https://gstatic.com"></script>
-    <script src="https://gstatic.com"></script>
-
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #1a1a24; color: #fff; text-align: center; padding: 10px; margin: 0; }
         .app-container { max-width: 480px; margin: 40px auto; background: #252632; padding: 25px; border-radius: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); border: 1px solid #333547; }
@@ -27,11 +21,11 @@
     <!-- PANTALLA 1: PROTECCIÓN DE INICIO DE SESIÓN -->
     <div class="app-container" id="pantallaLogin">
         <h1>🎺 TrumpetScan AI</h1>
-        <p>Para evitar fraudes y proteger tus escaneos, por favor inicia sesión de forma segura.</p>
-        <button class="btn-google" onclick="iniciarSesionGoogle()">🆔 Iniciar Sesión con Google</button>
+        <p>Para evitar fraudes y proteger tus escaneos, por favor inicia sesión de forma segura con tu cuenta.</p>
+        <button class="btn-google" id="btnLogin">🆔 Iniciar Sesión con Google</button>
     </div>
 
-    <!-- PANTALLA 2: EL ESCÁNER -->
+    <!-- PANTALLA 2: EL ESCÁNER REAL -->
     <div class="app-container oculto" id="pantallaApp">
         <h1 style="font-size: 22px;">Bienvenido, <span id="nombreUsuario" style="color:#27ae60;"></span></h1>
         <p id="cuentaEstado" style="color: #b2bec3;"></p>
@@ -39,26 +33,31 @@
 
         <div id="zonaEscaneo">
             <input type="file" id="archivoAudio" accept="audio/*" style="display:none;">
-            <button class="btn-accion" onclick="comprobarServidorYEscantar()">🎵 Escanear Canción</button>
+            <button class="btn-accion" id="btnEscaneo">🎵 Escanear Canción</button>
         </div>
 
         <div class="paywall-box" id="muroPago">
             <h3>⚠️ Límite Antifraude Alcanzado</h3>
             <p>Tu cuenta de Google ya consumió la prueba gratuita en nuestra base de datos global. Desbloquea el acceso ilimitado de por vida.</p>
             <h2 style="color: #fff;">\$4.99 USD</h2>
-            <button class="btn-accion" style="background:#27ae60;" onclick="comprarPremiumReal()">💎 Activar Cuenta Premium</button>
+            <button class="btn-accion" style="background:#27ae60;" id="btnPagar">💎 Activar Cuenta Premium</button>
         </div>
         
         <div id="resultadoArchivo" style="margin-top:20px;"></div>
         
-        <button class="btn-google" style="background:#c0392b; margin-top:40px; font-size:14px; padding:8px;" onclick="cerrarSesion()">Cerrar Sesión</button>
+        <button class="btn-google" style="background:#c0392b; margin-top:40px; font-size:14px; padding:8px;" id="btnCerrar">Cerrar Sesión</button>
     </div>
 
-    <script>
-        // Credenciales oficiales de tu proyecto TrumpetScan AI
+    <!-- CARGA DE LIBRERÍAS MODERNAS MODULARES -->
+    <script type="module">
+        import { initializeApp } from "https://gstatic.com";
+        import { getAuth, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged, signOut, getRedirectResult } from "https://gstatic.com";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://gstatic.com";
+
+        // Credenciales oficiales de TrumpetScan AI
         const firebaseConfig = {
             apiKey: "AIzaSyA819fotKek81avTqB3yP7T34sh1ogAWj0",
-            authDomain: "://firebaseapp.com",
+            authDomain: "trumpetscan-ai.firebaseapp.com",
             projectId: "trumpetscan-ai",
             storageBucket: "trumpetscan-ai.firebasestorage.app",
             messagingSenderId: "356737972999",
@@ -66,74 +65,64 @@
             measurementId: "G-C3CKYG253R"
         };
         
-        // Inicialización nativa y forzada
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+        // Inicialización limpia
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
 
-        // Controlamos el retorno automático de Google
-        auth.getRedirectResult().then(function(result) {
-            if (result && result.user) {
-                console.log("Sesión recuperada de la redirección:", result.user.displayName);
-            }
-        }).catch(function(error) {
-            alert("Falta autorizar el dominio en Firebase Settings: " + error.message);
+        // Escuchar retorno de redirección
+        getRedirectResult(auth).catch((error) => {
+            console.error("Error en retorno:", error.message);
         });
 
-        // Guardián del estado de cuenta
-        auth.onAuthStateChanged(function(usuario) {
+        // Guardián de seguridad en tiempo real
+        onAuthStateChanged(auth, async (usuario) => {
             if (usuario) {
                 document.getElementById('pantallaLogin').classList.add('oculto');
                 document.getElementById('pantallaApp').classList.remove('oculto');
-                document.getElementById('nombreUsuario').textContent = usuario.displayName;
+                document.getElementById('nombreUsuario').textContent = usuario.displayName || "Usuario";
                 
-                const docRef = db.collection("usuarios").doc(usuario.email);
-                
-                docRef.get().then(function(doc) {
-                    if (!doc.exists) {
-                        docRef.set({ esPremium: false, pruebasRestantes: 1 }).then(function() {
-                            document.getElementById('cuentaEstado').textContent = "Estado: Cuenta Gratuita (1 prueba restante)";
-                        });
+                const docRef = doc(db, "usuarios", usuario.email);
+                try {
+                    const docSnap = await getDoc(docRef);
+
+                    if (!docSnap.exists()) {
+                        await setDoc(docRef, { esPremium: false, pruebasRestantes: 1 });
+                        document.getElementById('cuentaEstado').textContent = "Estado: Cuenta Gratuita (1 prueba restante)";
                     } else {
-                        const datos = doc.data();
+                        const datos = docSnap.data();
                         if (datos.esPremium) {
                             document.getElementById('cuentaEstado').textContent = "Estado: 💎 Miembro Premium Ilimitado";
                             document.getElementById('muroPago').style.display = 'none';
                             document.getElementById('zonaEscaneo').style.display = 'block';
                         } else {
-                            document.getElementById('cuentaEstado').textContent = "Estado: Cuenta Gratuita (" + datos.pruebasRestantes + " pruebas restantes)";
+                            document.getElementById('cuentaEstado').textContent = `Estado: Cuenta Gratuita (${datos.pruebasRestantes} pruebas restantes)`;
                             if (datos.pruebasRestantes <= 0) {
                                 document.getElementById('zonaEscaneo').classList.add('oculto');
                                 document.getElementById('muroPago').style.display = 'block';
-                            } else {
-                                document.getElementById('zonaEscaneo').style.display = 'block';
-                                document.getElementById('muroPago').style.display = 'none';
                             }
                         }
                     }
-                }).catch(function(error) {
-                    console.log("Error consultando la base de datos:", error);
-                });
+                } catch (err) {
+                    console.error("Error en base de datos: ", err);
+                }
             } else {
                 document.getElementById('pantallaLogin').classList.remove('oculto');
                 document.getElementById('pantallaApp').classList.add('oculto');
             }
         });
 
-        // ACCIÓN DEL BOTÓN PRINCIPAL (Redirección total e inmediata)
-        function iniciarSesionGoogle() {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            // Forzamos al navegador a salir de la app hacia la pantalla segura de Google
-            auth.signInWithRedirect(provider);
-        }
+        // ASIGNACIÓN DIRECTA DE CLICK PARA EVITAR ACCIONES MUERTAS
+        document.getElementById('btnLogin').addEventListener('click', () => {
+            const provider = new GoogleAuthProvider();
+            signInWithRedirect(auth, provider);
+        });
 
-        async function comprobarServidorYEscantar() {
+        document.getElementById('btnEscaneo').addEventListener('click', async () => {
             const usuario = auth.currentUser;
-            const docRef = db.collection("usuarios").doc(usuario.email);
-            const doc = await docRef.get();
-            const datos = doc.data();
+            const docRef = doc(db, "usuarios", usuario.email);
+            const docSnap = await getDoc(docRef);
+            const datos = docSnap.data();
 
             if (!datos.esPremium && datos.pruebasRestantes <= 0) {
                 alert("🔒 Servidor: Tu cuenta ya gastó sus pruebas.");
@@ -141,22 +130,26 @@
             }
 
             if (!datos.esPremium) {
-                await docRef.update({ pruebasRestantes: datos.pruebasRestantes - 1 });
+                await updateDoc(docRef, { pruebasRestantes: datos.pruebasRestantes - 1 });
             }
             
             const notas = ["Do", "Re", "Mi", "Fa", "Sol", "La", "Si", "Do"];
             let html = `<h3>🎶 Notas Transcritas (Trompeta Bb):</h3><br>`;
             notas.forEach(n => { html += `<span class='nota-real'>${n}</span>`; });
             document.getElementById('resultadoArchivo').innerHTML = html;
-        }
+        });
 
-        async function comprarPremiumReal() {
+        document.getElementById('btnPagar').addEventListener('click', async () => {
             const usuario = auth.currentUser;
-            await db.collection("usuarios").doc(usuario.email).update({ esPremium: true });
+            const docRef = doc(db, "usuarios", usuario.email);
+            await updateDoc(docRef, { esPremium: true });
             alert("💎 ¡Cuenta Premium activada!");
-        }
+            window.location.reload();
+        });
 
-        function cerrarSesion() { auth.signOut(); }
+        document.getElementById('btnCerrar').addEventListener('click', () => {
+            signOut(auth);
+        });
     </script>
 </body>
 </html>
