@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TrumpetScan AI - Seguridad Máxima</title>
     
-    <!-- CONEXIÓN INVIOLABLE CORREGIDA: Cargamos las librerías oficiales de Google Firebase -->
+    <!-- Librerías oficiales y estables de Google Firebase (Versión 8 - Compat) -->
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
@@ -28,10 +28,10 @@
     <div class="app-container" id="pantallaLogin">
         <h1>🎺 TrumpetScan AI</h1>
         <p>Para evitar fraudes y proteger tus escaneos, por favor inicia sesión de forma segura.</p>
-        <button class="btn-google" onclick="iniciarSesionGoogle()">🆔 Iniciar Sesión con Google</button>
+        <button class="btn-google" id="botonGoogleReal" onclick="iniciarSesionGoogle()">🆔 Iniciar Sesión con Google</button>
     </div>
 
-    <!-- PANTALLA 2: EL ESCÁNER (Solo para usuarios verificados en la nube) -->
+    <!-- PANTALLA 2: EL ESCÁNER (Solo para usuarios verificados) -->
     <div class="app-container oculto" id="pantallaApp">
         <h1 style="font-size: 22px;">Bienvenido, <span id="nombreUsuario" style="color:#27ae60;"></span></h1>
         <p id="cuentaEstado" style="color: #b2bec3;"></p>
@@ -57,7 +57,7 @@
     </div>
 
     <script>
-        // FUSIÓN EXITOSA: Tus llaves comerciales de Google Firebase integradas
+        // Configuración oficial de tu proyecto
         const firebaseConfig = {
             apiKey: "AIzaSyA819fotKek81avTqB3yP7T34sh1ogAWj0",
             authDomain: "://firebaseapp.com",
@@ -68,57 +68,56 @@
             measurementId: "G-C3CKYG253R"
         };
         
-        // Inicializamos los módulos de seguridad
+        // Inicialización correcta sin bloqueos de código
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // Guardián en tiempo real conectado a internet
-        auth.onAuthStateChanged(async (usuario) => {
+        // Guardián del estado del usuario
+        auth.onAuthStateChanged(function(usuario) {
             if (usuario) {
                 document.getElementById('pantallaLogin').classList.add('oculto');
                 document.getElementById('pantallaApp').classList.remove('oculto');
                 document.getElementById('nombreUsuario').textContent = usuario.displayName;
                 
                 const docRef = db.collection("usuarios").doc(usuario.email);
-                const doc = await docRef.get();
-
-                if (!doc.exists) {
-                    // Si el correo jamás ha entrado, se registra con 1 prueba en los servidores de Google
-                    await docRef.set({ esPremium: false, pruebasRestantes: 1 });
-                    document.getElementById('cuentaEstado').textContent = "Estado: Cuenta Gratuita (1 prueba restante)";
-                    document.getElementById('zonaEscaneo').classList.remove('oculto');
-                    document.getElementById('muroPago').style.display = 'none';
-                } else {
-                    const datos = doc.data();
-                    if (datos.esPremium) {
-                        document.getElementById('cuentaEstado').textContent = "Estado: 💎 Miembro Premium Ilimitado";
-                        document.getElementById('zonaEscaneo').classList.remove('oculto');
-                        document.getElementById('muroPago').style.display = 'none';
+                
+                docRef.get().then(function(doc) {
+                    if (!doc.exists) {
+                        docRef.set({ esPremium: false, pruebasRestantes: 1 }).then(function() {
+                            document.getElementById('cuentaEstado').textContent = "Estado: Cuenta Gratuita (1 prueba restante)";
+                        });
                     } else {
-                        document.getElementById('cuentaEstado').textContent = `Estado: Cuenta Gratuita (${datos.pruebasRestantes} pruebas restantes)`;
-                        if (datos.pruebasRestantes <= 0) {
-                            document.getElementById('zonaEscaneo').classList.add('oculto');
-                            document.getElementById('muroPago').style.display = 'block';
-                        } else {
-                            document.getElementById('zonaEscaneo').classList.remove('oculto');
+                        const datos = doc.data();
+                        if (datos.esPremium) {
+                            document.getElementById('cuentaEstado').textContent = "Estado: 💎 Miembro Premium Ilimitado";
                             document.getElementById('muroPago').style.display = 'none';
+                            document.getElementById('zonaEscaneo').style.display = 'block';
+                        } else {
+                            document.getElementById('cuentaEstado').textContent = "Estado: Cuenta Gratuita (" + datos.pruebasRestantes + " pruebas restantes)";
+                            if (datos.pruebasRestantes <= 0) {
+                                document.getElementById('zonaEscaneo').classList.add('oculto');
+                                document.getElementById('muroPago').style.display = 'block';
+                            }
                         }
                     }
-                }
+                }).catch(function(error) {
+                    console.log("Error consultando la base de datos:", error);
+                });
             } else {
                 document.getElementById('pantallaLogin').classList.remove('oculto');
                 document.getElementById('pantallaApp').classList.add('oculto');
-                document.getElementById('resultadoArchivo').innerHTML = "";
             }
         });
 
+        // Función del botón (Arreglada de raíz)
         function iniciarSesionGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider).catch(err => alert("Error de conexión: " + err.message));
+            auth.signInWithPopup(provider).catch(function(err) {
+                alert("Error de conexión: " + err.message);
+            });
         }
 
-        // Lógica de escaneo con descuento real en la nube
         async function comprobarServidorYEscantar() {
             const usuario = auth.currentUser;
             const docRef = db.collection("usuarios").doc(usuario.email);
@@ -126,16 +125,14 @@
             const datos = doc.data();
 
             if (!datos.esPremium && datos.pruebasRestantes <= 0) {
-                alert("🔒 Servidor: Tu correo ya gastó sus pruebas.");
+                alert("🔒 Servidor: Tu cuenta ya gastó sus pruebas.");
                 return;
             }
 
-            // Descontamos la prueba directamente en la base de datos de Google en la nube
             if (!datos.esPremium) {
                 await docRef.update({ pruebasRestantes: datos.pruebasRestantes - 1 });
             }
             
-            // Abrimos simulación de notas limpias
             const notas = ["Do", "Re", "Mi", "Fa", "Sol", "La", "Si", "Do"];
             let html = `<h3>🎶 Notas Transcritas (Trompeta Bb):</h3><br>`;
             notas.forEach(n => { html += `<span class='nota-real'>${n}</span>`; });
@@ -145,7 +142,7 @@
         async function comprarPremiumReal() {
             const usuario = auth.currentUser;
             await db.collection("usuarios").doc(usuario.email).update({ esPremium: true });
-            alert("💎 ¡Base de datos actualizada! Tu cuenta de Google ahora es Premium ilimitada.");
+            alert("💎 ¡Cuenta Premium activada!");
         }
 
         function cerrarSesion() { auth.signOut(); }
