@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TrumpetScan AI - Seguridad Máxima</title>
     
-    <!-- Librerías oficiales y estables de Google Firebase (Versión 8 - Compat) -->
+    <!-- Librerías estables de Google Firebase (Versión 8) -->
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
@@ -28,22 +28,20 @@
     <div class="app-container" id="pantallaLogin">
         <h1>🎺 TrumpetScan AI</h1>
         <p>Para evitar fraudes y proteger tus escaneos, por favor inicia sesión de forma segura.</p>
-        <button class="btn-google" id="botonGoogleReal" onclick="iniciarSesionGoogle()">🆔 Iniciar Sesión con Google</button>
+        <button class="btn-google" onclick="iniciarSesionGoogle()">🆔 Iniciar Sesión con Google</button>
     </div>
 
-    <!-- PANTALLA 2: EL ESCÁNER (Solo para usuarios verificados) -->
+    <!-- PANTALLA 2: EL ESCÁNER -->
     <div class="app-container oculto" id="pantallaApp">
         <h1 style="font-size: 22px;">Bienvenido, <span id="nombreUsuario" style="color:#27ae60;"></span></h1>
         <p id="cuentaEstado" style="color: #b2bec3;"></p>
         <hr style="border-color: #333547; margin: 20px 0;">
 
-        <!-- El escáner real -->
         <div id="zonaEscaneo">
             <input type="file" id="archivoAudio" accept="audio/*" style="display:none;">
             <button class="btn-accion" onclick="comprobarServidorYEscantar()">🎵 Escanear Canción</button>
         </div>
 
-        <!-- Muro de pago controlado por los servidores de Google -->
         <div class="paywall-box" id="muroPago">
             <h3>⚠️ Límite Antifraude Alcanzado</h3>
             <p>Tu cuenta de Google ya consumió la prueba gratuita en nuestra base de datos global. Desbloquea el acceso ilimitado de por vida.</p>
@@ -57,10 +55,9 @@
     </div>
 
     <script>
-        // Configuración oficial de tu proyecto
         const firebaseConfig = {
             apiKey: "AIzaSyA819fotKek81avTqB3yP7T34sh1ogAWj0",
-            authDomain: "://firebaseapp.com",
+            authDomain: "trumpetscan-ai.firebaseapp.com",
             projectId: "trumpetscan-ai",
             storageBucket: "trumpetscan-ai.firebasestorage.app",
             messagingSenderId: "356737972999",
@@ -68,12 +65,19 @@
             measurementId: "G-C3CKYG253R"
         };
         
-        // Inicialización correcta sin bloqueos de código
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // Guardián del estado del usuario
+        // CAPTURA EL RETORNO: Esta función detecta si el usuario viene volviendo de iniciar sesión en Google
+        auth.getRedirectResult().then(function(result) {
+            if (result.user) {
+                console.log("Sesión iniciada vía redirección:", result.user.displayName);
+            }
+        }).catch(function(error) {
+            console.log("Error en el retorno de redirección:", error.message);
+        });
+
         auth.onAuthStateChanged(function(usuario) {
             if (usuario) {
                 document.getElementById('pantallaLogin').classList.add('oculto');
@@ -102,7 +106,7 @@
                         }
                     }
                 }).catch(function(error) {
-                    console.log("Error consultando la base de datos:", error);
+                    console.log("Error consultando base de datos:", error);
                 });
             } else {
                 document.getElementById('pantallaLogin').classList.remove('oculto');
@@ -110,12 +114,10 @@
             }
         });
 
-        // Función del botón (Arreglada de raíz)
+        // SOLUCIÓN RADICAL: Cambiamos signInWithPopup por signInWithRedirect
         function iniciarSesionGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider).catch(function(err) {
-                alert("Error de conexión: " + err.message);
-            });
+            auth.signInWithRedirect(provider);
         }
 
         async function comprobarServidorYEscantar() {
