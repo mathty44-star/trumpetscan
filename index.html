@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TrumpetScan AI - Core Motor</title>
+    <title>TrumpetScan AI - Motor Real</title>
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -37,20 +37,7 @@
             transition: 0.3s;
         }
         .btn-ia:hover { background-color: #e67e22; }
-        .progreso-container {
-            width: 100%;
-            background-color: #333547;
-            border-radius: 10px;
-            margin: 20px 0;
-            display: none;
-            overflow: hidden;
-        }
-        .barra-progreso {
-            width: 0%;
-            height: 12px;
-            background-color: #27ae60;
-            transition: width 0.1s ease;
-        }
+        #textoProgreso { color: #27ae60; font-size: 16px; margin-top: 10px; font-weight: bold; }
         #resultado-final {
             margin-top: 25px;
             padding: 20px;
@@ -77,90 +64,107 @@
 
     <div class="container">
         <h1>🎺 TrumpetScan AI</h1>
-        <p style="color: #b2bec3;">Sube cualquier canción para extraer la melodía transpuesta a Trompeta en Si Bemol (Bb).</p>
+        <p style="color: #b2bec3;">Escáner de frecuencia real. Sube un punteo limpio y extrae las notas transpuestas (Bb).</p>
         
         <input type="file" id="archivoAudio" accept="audio/*" style="display:none;">
-        <button class="btn-ia" onclick="document.getElementById('archivoAudio').click()">🎵 Seleccionar Canción</button>
+        <button class="btn-ia" onclick="document.getElementById('archivoAudio').click()">🎵 Analizar Punteo Real</button>
         
-        <!-- Barra de progreso visual -->
-        <div class="progreso-container" id="progresoContenedor">
-            <div class="barra-progreso" id="barra"></div>
-        </div>
-        <p id="textoProgreso" style="color: #b2bec3; font-size: 14px; margin-top: 10px;"></p>
+        <p id="textoProgreso"></p>
         
         <div id="resultado-final">
-            <p style="color: #7f8c8d;">Las notas extraídas aparecerán aquí al instante...</p>
+            <p style="color: #7f8c8d;">Las notas reales calculadas aparecerán aquí...</p>
         </div>
     </div>
 
     <script>
+        // Sistema de notas internacionales transposicionadas para trompeta Bb (+2 semitonos)
+        const NOTAS_TROM_Bb = ["Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Do", "Do#", "Si"];
+
         document.getElementById('archivoAudio').addEventListener('change', async function(evento) {
             const archivo = evento.target.files[0];
             if (!archivo) return;
 
-            const barra = document.getElementById('barra');
-            const contenedorBarra = document.getElementById('progresoContenedor');
             const textoProgreso = document.getElementById('textoProgreso');
             const resultadoDiv = document.getElementById('resultado-final');
 
-            // Reiniciamos y mostramos la barra de progreso
-            contenedorBarra.style.display = 'block';
-            barra.style.width = "0%";
+            textoProgreso.textContent = "⏳ Decodificando ondas de sonido... Por favor espera.";
             resultadoDiv.innerHTML = "";
-            textoProgreso.textContent = "✂️ Fragmentando audio en bloques ligeros para el dispositivo...";
 
             try {
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const arrayBuffer = await archivo.arrayBuffer();
                 const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
                 
-                const duracionTotal = audioBuffer.duration;
+                const datosCanal = audioBuffer.getChannelData(0); // Canal principal mono
+                const sampleRate = audioBuffer.sampleRate;
                 
-                // NOTAS TRANSTRITAS BASE: Esta es la lógica matemática de transposición (+2 semitonos)
-                // que usará la IA nativa del teléfono al procesar
-                let notasDetectadas = ["Re", "Mi", "Fa#", "Sol", "La", "Si", "Do#", "Re"]; 
-                let notasAMostrar = [];
+                const tamañoVentana = 2048; // Fragmento de análisis
+                let notasCalculadas = [];
 
-                let tiempoProcesado = 0;
-                const tamañoBloque = 2; // Procesamos en ráfagas de 2 segundos para máxima velocidad
+                // Recorremos todo el archivo de audio real buscando los Hz
+                for (let i = 0; i < datosCanal.length; i += tamañoVentana) {
+                    const fragmento = datosCanal.subarray(i, i + tamañoVentana);
+                    const frecuencia = autoCorrelacionReal(fragmento, sampleRate);
 
-                const intervalo = setInterval(() => {
-                    tiempoProcesado += tamañoBloque;
-                    let porcentaje = Math.min((tiempoProcesado / duracionTotal) * 100, 100);
-                    
-                    barra.style.width = porcentaje + "%";
-                    textoProgreso.textContent = `🔬 IA Analizando: ${porcentaje.toFixed(0)}% del audio...`;
+                    // Filtro de rango de melodía de trompeta común (ej. de 140Hz a 1000Hz)
+                    if (frecuencia > 130 && frecuencia < 1100) {
+                        // Fórmula física para transformar Hz a la escala musical de 12 notas
+                        const midi = Math.round(12 * Math.log2(frecuencia / 440)) + 69;
+                        
+                        // Obtenemos la nota transpuesta directa de nuestra lista (+2 semitonos integrada)
+                        const nombreNota = NOTAS_TROM_Bb[midi % 12];
 
-                    // Va soltando notas progresivamente en la pantalla para dar dinamismo comercial
-                    if (porcentaje > 20 && notasAMostrar.length === 0) {
-                        notasAMostrar.push(notasDetectadas[0], notasDetectadas[1]);
-                        actualizarPantalla(notasAMostrar, resultadoDiv);
+                        // Filtro de estabilidad: Evitamos amontonar notas duplicadas idénticas en milisegundos
+                        if (notasCalculadas.length === 0 || notasCalculadas[notasCalculadas.length - 1] !== nombreNota) {
+                            notasCalculadas.push(nombreNota);
+                        }
                     }
-                    if (porcentaje > 50 && notasAMostrar.length === 2) {
-                        notasAMostrar.push(notasDetectadas[2], notasDetectadas[3], notasDetectadas[4]);
-                        actualizarPantalla(notasAMostrar, resultadoDiv);
-                    }
+                }
 
-                    if (tiempoProcesado >= duracionTotal) {
-                        clearInterval(intervalo);
-                        textoProgreso.textContent = "✅ ¡Melodía analizada con éxito!";
-                        actualizarPantalla(notasDetectadas, resultadoDiv);
-                    }
-                }, 150); // Velocidad de renderizado ultra veloz
+                // Imprimimos el resultado limpio en la pantalla
+                textoProgreso.textContent = "✅ ¡Punteo escaneado de forma matemática!";
+                if (notasCalculadas.length === 0) {
+                    resultadoDiv.innerHTML = "<p style='color:#e74c3c;'>El audio es muy bajo o tiene mucho ruido. ¡Asegúrate de que el punteo se escuche fuerte!</p>";
+                } else {
+                    let html = `<h3>🎶 Notas Reales para tu Trompeta:</h3><br>`;
+                    notasCalculadas.forEach(nota => {
+                        html += `<span class="nota-real">${nota}</span>`;
+                    });
+                    resultadoDiv.innerHTML = html;
+                }
 
             } catch (error) {
-                textoProgreso.textContent = "❌ Error en el procesamiento del archivo.";
-                resultadoDiv.innerHTML = `<p style="color:#e74c3c;">El formato del archivo no es compatible o es demasiado pesado. Intenta con un fragmento corto.</p>`;
+                textoProgreso.textContent = "❌ Error al procesar.";
                 console.error(error);
             }
         });
 
-        function actualizarPantalla(lista, contenedor) {
-            let html = `<h3>🎶 Melodía Extraída (Trompeta Bb):</h3><br>`;
-            lista.forEach(nota => {
-                html += `<span class="nota-real">${nota}</span>`;
-            });
-            contenedor.innerHTML = html;
+        // Algoritmo YIN simplificado para captar el tono fundamental exacto del instrumento
+        function autoCorrelacionReal(buffer, sampleRate) {
+            const SIZE = buffer.length;
+            let r = new Float32Array(SIZE);
+            
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE - i; j++) {
+                    r[i] = r[i] + buffer[j] * buffer[j + i];
+                }
+            }
+
+            let d = 0;
+            while (r[d] > r[d + 1]) d++;
+            
+            let maxval = -1, maxpos = -1;
+            for (let i = d; i < SIZE; i++) {
+                if (r[i] > maxval && r[i] > r[i - 1] && r[i] > r[i + 1]) {
+                    maxval = r[i];
+                    maxpos = i;
+                    break;
+                }
+            }
+            if (maxpos !== -1) {
+                return sampleRate / maxpos;
+            }
+            return -1;
         }
     </script>
 </body>
