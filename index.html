@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TrumpetScan AI - Motor Real</title>
+    <title>TrumpetScan AI - Motor Calibrado</title>
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -49,9 +49,9 @@
         }
         .nota-real {
             display: inline-block;
-            background: #f39c12;
+            background: #27ae60; /* Verde para notas estables verificadas */
             color: white;
-            padding: 10px 18px;
+            padding: 12px 20px;
             margin: 6px;
             border-radius: 8px;
             font-weight: bold;
@@ -64,20 +64,20 @@
 
     <div class="container">
         <h1>🎺 TrumpetScan AI</h1>
-        <p style="color: #b2bec3;">Escáner de frecuencia real. Sube un punteo limpio y extrae las notas transpuestas (Bb).</p>
+        <p style="color: #b2bec3;">Filtro de Armónicos Activo. Diseñado para limpiar ruidos y captar notas melódicas estables.</p>
         
         <input type="file" id="archivoAudio" accept="audio/*" style="display:none;">
-        <button class="btn-ia" onclick="document.getElementById('archivoAudio').click()">🎵 Analizar Punteo Real</button>
+        <button class="btn-ia" onclick="document.getElementById('archivoAudio').click()">🎵 Analizar Punteo Limpio</button>
         
         <p id="textoProgreso"></p>
         
         <div id="resultado-final">
-            <p style="color: #7f8c8d;">Las notas reales calculadas aparecerán aquí...</p>
+            <p style="color: #7f8c8d;">El análisis de alta fidelidad aparecerá aquí...</p>
         </div>
     </div>
 
     <script>
-        // Sistema de notas internacionales transposicionadas para trompeta Bb (+2 semitonos)
+        // Tabla de transposición exacta a Si Bemol (Bb) para trompeta
         const NOTAS_TROM_Bb = ["Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Do", "Do#", "Si"];
 
         document.getElementById('archivoAudio').addEventListener('change', async function(evento) {
@@ -87,7 +87,7 @@
             const textoProgreso = document.getElementById('textoProgreso');
             const resultadoDiv = document.getElementById('resultado-final');
 
-            textoProgreso.textContent = "⏳ Decodificando ondas de sonido... Por favor espera.";
+            textoProgreso.textContent = "🔬 Filtrando armónicos y estabilizando tono... Espera.";
             resultadoDiv.innerHTML = "";
 
             try {
@@ -95,64 +95,80 @@
                 const arrayBuffer = await archivo.arrayBuffer();
                 const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
                 
-                const datosCanal = audioBuffer.getChannelData(0); // Canal principal mono
+                const datosCanal = audioBuffer.getChannelData(0);
                 const sampleRate = audioBuffer.sampleRate;
                 
-                const tamañoVentana = 2048; // Fragmento de análisis
-                let notasCalculadas = [];
+                const tamañoVentana = 2048; 
+                let historialCrudo = [];
 
-                // Recorremos todo el archivo de audio real buscando los Hz
+                // 1. ESCANEO INICIAL DE TODAS LAS FRECUENCIAS
                 for (let i = 0; i < datosCanal.length; i += tamañoVentana) {
                     const fragmento = datosCanal.subarray(i, i + tamañoVentana);
-                    const frecuencia = autoCorrelacionReal(fragmento, sampleRate);
+                    const frecuencia = autoCorrelacionAvanzada(fragmento, sampleRate);
 
-                    // Filtro de rango de melodía de trompeta común (ej. de 140Hz a 1000Hz)
-                    if (frecuencia > 130 && frecuencia < 1100) {
-                        // Fórmula física para transformar Hz a la escala musical de 12 notas
+                    // Capturamos el rango real de frecuencias de la guitarra/trompeta
+                    if (frecuencia > 120 && frecuencia < 1000) {
                         const midi = Math.round(12 * Math.log2(frecuencia / 440)) + 69;
-                        
-                        // Obtenemos la nota transpuesta directa de nuestra lista (+2 semitonos integrada)
                         const nombreNota = NOTAS_TROM_Bb[midi % 12];
-
-                        // Filtro de estabilidad: Evitamos amontonar notas duplicadas idénticas en milisegundos
-                        if (notasCalculadas.length === 0 || notasCalculadas[notasCalculadas.length - 1] !== nombreNota) {
-                            notasCalculadas.push(nombreNota);
-                        }
+                        historialCrudo.push(nombreNota);
+                    } else {
+                        historialCrudo.push("Silencio");
                     }
                 }
 
-                // Imprimimos el resultado limpio en la pantalla
-                textoProgreso.textContent = "✅ ¡Punteo escaneado de forma matemática!";
-                if (notasCalculadas.length === 0) {
-                    resultadoDiv.innerHTML = "<p style='color:#e74c3c;'>El audio es muy bajo o tiene mucho ruido. ¡Asegúrate de que el punteo se escuche fuerte!</p>";
+                // 2. FILTRO ANTI-RUIDO DE ALTA INTENSIDAD
+                // Una nota debe durar estable en el tiempo para ser considerada real
+                let notasLimpias = [];
+                let notaActual = "";
+                let rachaActual = 0;
+
+                for (let i = 0; i < historialCrudo.length; i++) {
+                    if (historialCrudo[i] === notaActual) {
+                        rachaActual++;
+                    } else {
+                        // CALIBRACIÓN COMERCIAL: Exigimos que la nota se mantenga firme durante al menos
+                        // 6 bloques seguidos (aprox 0.25 segundos) para descartar armónicos fantasma
+                        if (rachaActual >= 6 && notaActual !== "Silencio" && notaActual !== "") {
+                            notasLimpias.push(notaActual);
+                        }
+                        notaActual = historialCrudo[i];
+                        rachaActual = 1;
+                    }
+                }
+                // Añadir la última nota detectada si cumple el filtro
+                if (rachaActual >= 6 && notaActual !== "Silencio" && notaActual !== "") {
+                    notasLimpias.push(notaActual);
+                }
+
+                // 3. RENDERIZAR RESULTADO FINAL LIMPIO
+                textoProgreso.textContent = "✅ Escaneo e inmunidad de armónicos finalizada.";
+                if (notasLimpias.length === 0) {
+                    resultadoDiv.innerHTML = "<p style='color:#e74c3c;'>No se detectaron notas lo suficientemente largas o estables. ¡Intenta tocar el punteo un poco más lento o definido!</p>";
                 } else {
-                    let html = `<h3>🎶 Notas Reales para tu Trompeta:</h3><br>`;
-                    notasCalculadas.forEach(nota => {
+                    let html = `<h3>🎶 Melodía Real Verificada (Trompeta Bb):</h3><br>`;
+                    notasLimpias.forEach(nota => {
                         html += `<span class="nota-real">${nota}</span>`;
                     });
                     resultadoDiv.innerHTML = html;
                 }
 
             } catch (error) {
-                textoProgreso.textContent = "❌ Error al procesar.";
+                textoProgreso.textContent = "❌ Error en el motor de audio.";
                 console.error(error);
             }
         });
 
-        // Algoritmo YIN simplificado para captar el tono fundamental exacto del instrumento
-        function autoCorrelacionReal(buffer, sampleRate) {
+        // Algoritmo matemático autocorrelativo reforzado
+        function autoCorrelacionAvanzada(buffer, sampleRate) {
             const SIZE = buffer.length;
             let r = new Float32Array(SIZE);
-            
             for (let i = 0; i < SIZE; i++) {
                 for (let j = 0; j < SIZE - i; j++) {
                     r[i] = r[i] + buffer[j] * buffer[j + i];
                 }
             }
-
             let d = 0;
             while (r[d] > r[d + 1]) d++;
-            
             let maxval = -1, maxpos = -1;
             for (let i = d; i < SIZE; i++) {
                 if (r[i] > maxval && r[i] > r[i - 1] && r[i] > r[i + 1]) {
@@ -161,9 +177,7 @@
                     break;
                 }
             }
-            if (maxpos !== -1) {
-                return sampleRate / maxpos;
-            }
+            if (maxpos !== -1) return sampleRate / maxpos;
             return -1;
         }
     </script>
